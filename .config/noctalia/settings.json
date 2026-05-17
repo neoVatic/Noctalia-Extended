@@ -706,7 +706,7 @@
         "panelBackgroundOpacity": 0.66,
         "panelsAttachedToBar": false,
         "scrollbarAlwaysVisible": true,
-        "settingsPanelMode": "window",
+        "settingsPanelMode": "centered",
         "settingsPanelSideBarCardStyle": false,
         "tooltipsEnabled": true,
         "translucentWidgets": false

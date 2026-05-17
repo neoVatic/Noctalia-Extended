@@ -23,6 +23,15 @@ ColumnLayout {
   property string mpvpaperPath: ""
   property string configRaw: ""
 
+  readonly property string millenniumConfigFile: Quickshell.env("HOME") + "/.config/millennium/config.json"
+  property string millenniumAccentColor: "#58a6ff"
+  property string millenniumConfigRaw: ""
+
+  readonly property string vesktopThemeFile: Quickshell.env("HOME") + "/.config/vesktop/themes/DarkMatter.theme.css"
+  property string vesktopThemeRaw: ""
+  property var vesktopColorValues: ({})
+  property int vesktopVersion: 0
+
   function parseMpvpaperPath(text) {
     var match = text.match(/spawn-at-startup\s+"mpvpaper"(?:\s+"[^"]*"){3}\s+"([^"]+)"/);
     return match ? match[1] : "";
@@ -39,6 +48,73 @@ ColumnLayout {
       configWriter.path = root.niriConfigFile;
       configWriter.setText(newRaw);
     }
+  }
+
+  function loadMillenniumConfig() {
+    millenniumReader.path = root.millenniumConfigFile;
+  }
+
+  function setMillenniumAccentColor(value) {
+    var clean = value;
+    if (clean.length === 9 && clean.substring(0, 3) === "#ff") clean = "#" + clean.substring(3);
+    root.millenniumAccentColor = clean;
+    try {
+      var config = JSON.parse(root.millenniumConfigRaw);
+      config.general.accentColor = clean;
+      var newRaw = JSON.stringify(config, null, 2);
+      root.millenniumConfigRaw = newRaw;
+      millenniumWriter.path = "";
+      millenniumWriter.path = root.millenniumConfigFile;
+      millenniumWriter.setText(newRaw);
+    } catch (e) {}
+  }
+
+  function rgbToHex(rgb) {
+    var parts = rgb.split(",");
+    if (parts.length !== 3) return "#000000";
+    var r = parseInt(parts[0].trim());
+    var g = parseInt(parts[1].trim());
+    var b = parseInt(parts[2].trim());
+    return "#" + [r, g, b].map(function(x) {
+      var h = x.toString(16);
+      return h.length === 1 ? "0" + h : h;
+    }).join("");
+  }
+
+  function hexToRgb(hex) {
+    hex = hex.replace("#", "");
+    if (hex.length === 8) hex = hex.substring(2);
+    if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    var r = parseInt(hex.substring(0, 2), 16);
+    var g = parseInt(hex.substring(2, 4), 16);
+    var b = parseInt(hex.substring(4, 6), 16);
+    return r + ", " + g + ", " + b;
+  }
+
+  function loadVesktopTheme() {
+    vesktopReader.path = root.vesktopThemeFile;
+  }
+
+  function setVesktopColor(variable, value) {
+    root.vesktopColorValues[variable] = value;
+    root.vesktopVersion++;
+    var re = new RegExp("(" + root.escapeRegex(variable) + "\\s*:\\s*)[^;]+");
+    root.vesktopThemeRaw = root.vesktopThemeRaw.replace(re, "$1" + value);
+    vesktopWriter.path = "";
+    vesktopWriter.path = root.vesktopThemeFile;
+    vesktopWriter.setText(root.vesktopThemeRaw);
+  }
+
+  function getVesktopColor(variable) {
+    var _ = root.vesktopVersion;
+    return root.vesktopColorValues[variable] || "";
+  }
+
+  function getVesktopColorHex(variable, format) {
+    var _ = root.vesktopVersion;
+    var val = root.vesktopColorValues[variable];
+    if (!val) return "#000000";
+    return format === "rgb" ? root.rgbToHex(val) : val;
   }
 
   function hexToQml(h) {
@@ -170,6 +246,55 @@ ColumnLayout {
     onSaved: {
       Quickshell.execDetached(["bash", "-c", "pkill mpvpaper; mpvpaper -o 'loop panscan=1.0' '*' '" + root.mpvpaperPath + "' &"]);
       ToastService.showNotice("mpvpaper", "Wallpaper path saved and applied", "video");
+    }
+  }
+
+  FileView {
+    id: millenniumReader
+    path: ""
+    printErrors: false
+    onLoaded: {
+      root.millenniumConfigRaw = text();
+      try {
+        var config = JSON.parse(text());
+        if (config.general && config.general.accentColor)
+          root.millenniumAccentColor = config.general.accentColor;
+      } catch (e) {}
+    }
+  }
+
+  FileView {
+    id: millenniumWriter
+    path: ""
+    printErrors: false
+    onSaved: {
+      ToastService.showNotice("Steam Accent", "Saved — restart Steam to apply", "color-picker");
+    }
+  }
+
+  FileView {
+    id: vesktopReader
+    path: ""
+    printErrors: false
+    onLoaded: {
+      root.vesktopThemeRaw = text();
+      var raw = text();
+      var colorVars = ["--background-solid", "--background-solid-dark", "--background-solid-darker", "--accent", "--accent-alt"];
+      for (var i = 0; i < colorVars.length; i++) {
+        var re = new RegExp(root.escapeRegex(colorVars[i]) + "\\s*:\\s*([^;]+)");
+        var m = raw.match(re);
+        if (m) root.vesktopColorValues[colorVars[i]] = m[1].trim();
+      }
+      root.vesktopVersion++;
+    }
+  }
+
+  FileView {
+    id: vesktopWriter
+    path: ""
+    printErrors: false
+    onSaved: {
+      ToastService.showNotice("Vesktop Theme", "Saved — reload Vesktop to apply", "color-picker");
     }
   }
 
@@ -562,6 +687,228 @@ ColumnLayout {
 
   NDivider { Layout.fillWidth: true; Layout.bottomMargin: Style.marginM }
 
+  NHeader {
+    label: "Steam Millennium Accent Color"
+    description: "Changes the accent color used by Millennium themes"
+    Layout.bottomMargin: Style.marginM
+  }
+
+  NBox {
+    Layout.fillWidth: true
+    implicitHeight: rowMillennium.implicitHeight + Style.margin2L
+
+    RowLayout {
+      id: rowMillennium
+      anchors.fill: parent
+      anchors.margins: Style.marginL
+      spacing: Style.marginM
+
+      Rectangle {
+        Layout.preferredWidth: Style.baseWidgetSize
+        Layout.preferredHeight: Style.baseWidgetSize
+        radius: Style.iRadiusS
+        color: root.hexToQml(root.millenniumAccentColor)
+        border.color: Color.mOutline
+        border.width: Style.borderS
+      }
+
+      NText {
+        text: "Accent Color"
+        Layout.fillWidth: true
+        font.capitalization: Font.Capitalize
+      }
+
+      NText {
+        text: root.millenniumAccentColor.toUpperCase()
+        family: Settings.data.ui.fontFixed
+        color: Color.mOnSurfaceVariant
+      }
+
+      NIconButton {
+        icon: "color-picker"
+        onClicked: {
+          var dialog = colorPickerComponent.createObject(root, {
+            selectedColor: root.hexToQml(root.millenniumAccentColor),
+            parent: Overlay.overlay,
+            screen: root.getScreen()
+          });
+          dialog.colorSelected.connect(function(color) {
+            root.setMillenniumAccentColor(color.toString());
+          });
+          dialog.open();
+        }
+      }
+
+      NIconButton {
+        icon: "copy"
+        tooltipText: "Copy color code"
+        onClicked: {
+          root.copiedColor = root.millenniumAccentColor;
+          Quickshell.execDetached(["wl-copy", root.copiedColor]);
+          ToastService.showNotice("Copied", "Accent: " + root.copiedColor, "clipboard");
+        }
+      }
+
+      NIconButton {
+        icon: "clipboard-plus"
+        tooltipText: "Paste color code"
+        enabled: root.copiedColor.length > 0
+        onClicked: {
+          if (root.copiedColor)
+            root.setMillenniumAccentColor(root.copiedColor);
+        }
+      }
+    }
+  }
+
+  RowLayout {
+    Layout.fillWidth: true
+    Layout.topMargin: Style.marginM
+
+    NButton {
+      text: "Kill Steam"
+      icon: "power-standby"
+      onClicked: killSteam.running = true
+    }
+
+    NText {
+      text: "Forcefully terminates the Steam process"
+      color: Color.mOnSurfaceVariant
+      pointSize: Style.fontSizeS
+      Layout.fillWidth: true
+      elide: Text.ElideRight
+    }
+  }
+
+  Process {
+    id: killSteam
+    command: ["killall", "steam"]
+    onRunningChanged: {
+      if (!running)
+        ToastService.showNotice("Steam", "Steam process terminated", "power-standby");
+    }
+  }
+
+  NDivider { Layout.fillWidth: true; Layout.bottomMargin: Style.marginM }
+
+  NHeader {
+    label: "Vesktop DarkMatter Theme"
+    description: "Customize colors for the Vesktop Discord client theme"
+    Layout.bottomMargin: Style.marginM
+  }
+
+  Repeater {
+    model: [
+      { variable: "--background-solid", label: "Background Solid", format: "hex" },
+      { variable: "--background-solid-dark", label: "Background Solid Dark", format: "hex" },
+      { variable: "--background-solid-darker", label: "Background Solid Darker", format: "hex" },
+      { variable: "--accent", label: "Accent", format: "rgb" },
+      { variable: "--accent-alt", label: "Accent Alt", format: "rgb" }
+    ]
+
+    delegate: NBox {
+      required property var modelData
+      Layout.fillWidth: true
+      implicitHeight: rowLayout.implicitHeight + Style.margin2L
+
+      RowLayout {
+        id: rowLayout
+        anchors.fill: parent
+        anchors.margins: Style.marginL
+        spacing: Style.marginM
+
+        Rectangle {
+          Layout.preferredWidth: Style.baseWidgetSize
+          Layout.preferredHeight: Style.baseWidgetSize
+          radius: Style.iRadiusS
+          color: root.hexToQml(root.getVesktopColorHex(modelData.variable, modelData.format))
+          border.color: Color.mOutline
+          border.width: Style.borderS
+        }
+
+        NText {
+          text: modelData.label
+          Layout.fillWidth: true
+          font.capitalization: Font.Capitalize
+        }
+
+        NText {
+          text: root.getVesktopColor(modelData.variable).toUpperCase()
+          family: Settings.data.ui.fontFixed
+          color: Color.mOnSurfaceVariant
+        }
+
+        NIconButton {
+          icon: "color-picker"
+          onClicked: {
+            var currentHex = root.getVesktopColorHex(modelData.variable, modelData.format);
+            var dialog = colorPickerComponent.createObject(root, {
+              selectedColor: root.hexToQml(currentHex),
+              parent: Overlay.overlay,
+              screen: root.getScreen()
+            });
+            dialog.colorSelected.connect(function(color) {
+              var hex = color.toString();
+              if (hex.length === 9 && hex.substring(0, 3) === "#ff") hex = "#" + hex.substring(3);
+              var value = modelData.format === "rgb" ? root.hexToRgb(hex) : hex;
+              root.setVesktopColor(modelData.variable, value);
+            });
+            dialog.open();
+          }
+        }
+
+        NIconButton {
+          icon: "copy"
+          tooltipText: "Copy color code"
+          onClicked: {
+            var val = root.getVesktopColor(modelData.variable);
+            root.copiedColor = val;
+            Quickshell.execDetached(["wl-copy", root.copiedColor]);
+            ToastService.showNotice("Copied", modelData.label + ": " + root.copiedColor, "clipboard");
+          }
+        }
+
+        NIconButton {
+          icon: "clipboard-plus"
+          tooltipText: "Paste color code"
+          enabled: root.copiedColor.length > 0
+          onClicked: {
+            if (root.copiedColor)
+              root.setVesktopColor(modelData.variable, root.copiedColor);
+          }
+        }
+      }
+    }
+  }
+
+  RowLayout {
+    Layout.fillWidth: true
+    Layout.topMargin: Style.marginM
+
+    NButton {
+      text: "Kill Discord"
+      icon: "power-standby"
+      onClicked: killDiscord.running = true
+    }
+
+    NText {
+      text: "Forcefully terminates the Vesktop process"
+      color: Color.mOnSurfaceVariant
+      pointSize: Style.fontSizeS
+      Layout.fillWidth: true
+      elide: Text.ElideRight
+    }
+  }
+
+  Process {
+    id: killDiscord
+    command: ["pkill", "-f", "vesktop"]
+    onRunningChanged: {
+      if (!running)
+        ToastService.showNotice("Discord", "Vesktop process terminated", "power-standby");
+    }
+  }
+
   Component {
     id: colorPickerComponent
     NColorPickerDialog {}
@@ -574,5 +921,7 @@ ColumnLayout {
   Component.onCompleted: {
     kdlReader.path = root.niriFile;
     configReader.path = root.niriConfigFile;
+    root.loadMillenniumConfig();
+    root.loadVesktopTheme();
   }
 }
