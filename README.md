@@ -7,10 +7,13 @@ It also adds a toggle for rounded window corners and a gradient effect on the ac
 
 Change terminal colors through GUI and save presets (Alacritty)
 <img width="834" height="902" alt="image" src="https://github.com/user-attachments/assets/8ef026bb-fac6-4c86-bcce-20d999ae56c8" />
+
 Change from round to sharp corners, and vice versa. Added new option to Niri, have 2 gradient colors. Video wallpaper choser using MPVPAPER, steam accent color changer through millenium (steam custom theme client). Vesktop theme color changer (discord client).
 <img width="834" height="902" alt="image" src="https://github.com/user-attachments/assets/eda9e6b5-3a98-4f69-aa2a-5146fe2985e4" />
+
 Allows you to edit theme color values through GUI, will write to active theme's file, overriding color values whem applying
 <img width="834" height="902" alt="image" src="https://github.com/user-attachments/assets/5922c16d-0acb-488a-a494-7a807897e156" />
+
 
 
 Noctalia Extended
